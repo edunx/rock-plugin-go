@@ -24,7 +24,6 @@ func CreatePluginUserData(L *lua.LState) int {
 	p := &Plugin{
 		C: Config{
 			path: opt.CheckString("path" , "./"),
-			buffer: opt.CheckInt("buffer" , 1024),
 			interval: opt.CheckInt("interval" , 1000),
 		},
 	}

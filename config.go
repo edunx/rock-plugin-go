@@ -7,7 +7,6 @@ import (
 
 type Config struct {
 	path                string
-	buffer    int   //缓存大小
 	interval  int
 }
 
