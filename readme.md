@@ -6,7 +6,6 @@
 ```lua
     local p = rock.plugin{
         path = "resource/plugin",
-        buffer = 1024,
         interval = 1000, --ms
     }
 
