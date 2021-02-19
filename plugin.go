@@ -6,11 +6,12 @@ import (
 	"github.com/edunx/lua/parse"
 	pub "github.com/edunx/rock-public-go"
 	"os"
+	"sync"
 	"time"
 )
 
 func (p *Plugin) Start() error {
-	p.Scripts = make(map[string]PluginFunction , p.C.buffer)
+	p.Cache = sync.Map{ }
 
 	go p.sync()
 	return nil
@@ -45,52 +46,46 @@ func (p *Plugin) compile( name string ) *lua.LFunction {
 	}
 
 	fn := pub.VM.NewFunctionFromProto( proto )
-	p.Scripts[name] = PluginFunction{
+	p.Cache.Store(name , PluginFunction{
 		fn: fn,
 		modTime: stat.ModTime().Unix(),
-	}
+	})
 
 	return fn
 }
 
 func (p *Plugin) load( name string ) *lua.LFunction {
 	pub.Out.Debug("start load %s plugin" , name)
-	plg , ok := p.Scripts[name]
-	if ok { return plg.fn }
+	v , ok := p.Cache.Load(name)
+	if ok { return v.(PluginFunction).fn }
 
 	return p.compile( name )
-}
-
-func (p *Plugin) Check() {
-	for name , plg := range p.Scripts {
-		filename := fmt.Sprintf("%s/%s.lua" ,p.C.path , name)
-		stat , err := os.Stat( filename )
-		if os.IsNotExist(err) {
-			delete(p.Scripts , name)
-			continue
-		}
-
-		if stat.ModTime().Unix() != plg.modTime {
-			p.compile( name )
-			continue
-		}
-	}
-}
-
-func (p *Plugin) Remove( name string ) {
-	delete(p.Scripts , name)
 }
 
 func (p *Plugin) sync() {
 	tk := time.NewTicker( time.Duration( p.C.interval) * time.Millisecond )
 	defer tk.Stop()
 
-	for range tk.C { for name , pl := range p.Scripts {
-		file := fmt.Sprintf("%s/%s.lua" , p.C.path , name)
-		stat , err := os.Stat( file )
-		if os.IsNotExist( err ) { p.Remove( name ) ; continue }
-		if stat.ModTime().Unix() != pl.modTime { p.compile( name )}
-	}}
+	for range tk.C {
+		p.Cache.Range( func(k interface{}, v interface{}) bool {
+			name := k.(string)
+			pl  := v.(PluginFunction)
+
+			file := fmt.Sprintf("%s/%s.lua" , p.C.path , name)
+			stat , err := os.Stat( file )
+			if os.IsNotExist( err ) {
+				p.Cache.Delete( name )
+				return false //next
+			}
+
+			if stat.ModTime().Unix() != pl.modTime {
+				p.compile( name )
+				return false //next
+			}
+
+			return false
+		})
+	}
 }
 
 func (p *Plugin) pcall(L *lua.LState , name string) {

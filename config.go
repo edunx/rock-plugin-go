@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"github.com/edunx/lua"
+	"sync"
 )
 
 type Config struct {
@@ -17,5 +18,5 @@ type PluginFunction struct {
 
 type Plugin struct {
 	C  Config
-	Scripts   map[string]PluginFunction
+	Cache sync.Map
 }
