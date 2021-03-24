@@ -88,7 +88,7 @@ func (p *Plugin) sync() {
 	}
 }
 
-func (p *Plugin) pcall(L *lua.LState , name string) {
+func (p *Plugin) Pcall(L *lua.LState , name string) {
 	fn := p.load( name )
 	if fn == nil { return }
 

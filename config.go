@@ -16,6 +16,8 @@ type PluginFunction struct {
 }
 
 type Plugin struct {
+	lua.Super
+
 	C  Config
 	Cache sync.Map
 }

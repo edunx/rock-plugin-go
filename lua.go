@@ -5,21 +5,23 @@ import (
 	pub "github.com/edunx/rock-public-go"
 )
 
-const (
-	MT string = "ROCK_PLUGIN_GO_MT"
-)
-
-func CheckPluginUserData(L *lua.LState , idx int) *Plugin {
-	ud := L.CheckUserData( idx )
-	v , ok := ud.Value.(*Plugin)
-	if ok { return v }
-
-	L.RaiseError("#%d must be Plugin userdata , got fail" , idx)
-	return nil
+func (self *Plugin) LPcall(L *lua.LState , args *lua.Args) lua.LValue {
+	self.Pcall(L , args.CheckString(L , 1) )
+	return lua.LNil
 }
 
-func CreatePluginUserData(L *lua.LState) int {
-	opt := L.CheckTable(1)
+func (self *Plugin) ToLightUserData(L *lua.LState) *lua.LightUserData {
+	return L.NewLightUserData( self )
+}
+
+func (self *Plugin) Index(L *lua.LState , key string ) lua.LValue {
+	if key == "pcall"  { return lua.NewGFunction( self.LPcall )}
+
+	return lua.LNil
+}
+
+func createPluginLightUserData(L *lua.LState , args *lua.Args) lua.LValue {
+	opt := args.CheckTable(L , 1)
 
 	p := &Plugin{
 		C: Config{
@@ -30,47 +32,12 @@ func CreatePluginUserData(L *lua.LState) int {
 
 	if e := p.Start(); e != nil {
 		pub.Out.Debug("start plugin fail , err: %v" , e)
-		return 0
+		return lua.LNil
 	}
 
-	ud := L.NewUserDataByInterface(p , MT)
-	L.Push(ud)
-
-	return 1
-
+	return p.ToLightUserData(L)
 }
-
 
 func LuaInjectApi(L *lua.LState , parent *lua.LTable) {
-	mt := L.NewTypeMetatable( MT )
-
-	L.SetField(mt , "__index" , L.NewFunction(Get))
-	L.SetField(mt , "__newindex" , L.NewFunction(Set))
-
-	L.SetField(parent , "plugin" , L.NewFunction(CreatePluginUserData))
-}
-
-func Get(L *lua.LState) int {
-	self := CheckPluginUserData(L , 1)
-	name := L.CheckString(2)
-	switch name {
-	case "pcall":
-		L.Push(L.NewFunction( func (L *lua.LState) int {
-			name := L.CheckString(1)
-			self.pcall(L , name)
-			return 0
-		}))
-	default:
-		L.Push(lua.LNil)
-	}
-
-	return 1
-}
-
-func Set(L *lua.LState) int {
-	return 0
-}
-
-func (p *Plugin) ToUserData(L *lua.LState) *lua.LUserData {
-	return L.NewUserDataByInterface( p , MT )
+	L.SetField(parent , "plugin" , lua.NewGFunction( createPluginLightUserData ) )
 }
